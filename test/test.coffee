@@ -17,8 +17,20 @@ describe 'Helper functions', ->
     describe 'generalizedScale', ->
         it 'should scale a scalar', ->
             assert.equal linear._generalizedScale(5, 2), 10
+
         it 'should scale a vector', ->
             assert.equal linear._generalizedScale(new linear.Vector(5), 2).data, 10
+
+    describe 'sigma', ->
+        it 'should produce 1 for even values', ->
+            assert.equal linear._sigma(0), 1
+            assert.equal linear._sigma(2), 1
+            assert.equal linear._sigma(4), 1
+
+        it 'should produce -1 for odd values', ->
+            assert.equal linear._sigma(1), -1
+            assert.equal linear._sigma(3), -1
+            assert.equal linear._sigma(5), -1
 
 describe 'Vector', ->
     v0 = new linear.Vector(1, 1, 1)
@@ -28,40 +40,59 @@ describe 'Vector', ->
 
     it 'can be constructed', ->
         assert.deepEqual v1.data, linear.Vector.fromArray([1, 2]).data
+
+    it 'should be comparable', ->
+        assert.ok v0.equal(new linear.Vector(1, 1, 1))
+
     it 'can be 2d', ->
         assert.equal v1.data[0], 1
         assert.equal v1.data[1], 2
+
     it 'can be 3d', ->
         assert.equal v3.data[2], 3
+
     it 'should have length', ->
         assert.equal v0.length(), Math.sqrt(3)
-    it 'should have units', ->
+
+    it 'should have bases', ->
         i = linear.Vector.i()
         assert.deepEqual i.data, [1, 0, 0]
         j = linear.Vector.j()
         assert.deepEqual j.data, [0, 1, 0]
         k = linear.Vector.k()
         assert.deepEqual k.data, [0, 0, 1]
+
+        x4of5 = linear.Vector.base(3, 5)
+        assert.deepEqual x4of5.data, [0, 0, 0, 1, 0]
+
     it 'can be cloned', ->
         v3_prime = v3.clone()
         assert.deepEqual v3_prime.data, v3.data
         v3_prime.data[0] = 100
         assert.notEqual v3_prime.data[0], v3.data[0]
+
     it 'can be negated', ->
         v1_neg = new linear.Vector(-1, -2)
         assert.deepEqual v1.negate().data, v1_neg.data
+
     it 'can be added', ->
         assert.deepEqual v1.plus(v2).data, (new linear.Vector(1 + 3, 2 + 4)).data
+
     it 'can be subtracted', ->
         assert.deepEqual v1.minus(v2).data, (new linear.Vector(1 - 3, 2 - 4)).data
+
     it 'can be scaled', ->
         assert.deepEqual v1.scale(5).data, (new linear.Vector(1 * 5, 2 * 5)).data
+
+    it 'can be normalized', ->
+        assert.deepEqual v1.normalize().data, [1 / Math.sqrt(5), 2 / Math.sqrt(5)]
 
     describe 'products', ->
         it 'should have a dot product', ->
             v1 = new linear.Vector(1, 2, 3)
             v2 = new linear.Vector(5, 6, 7)
             assert.equal v1.dot(v2), 38
+
         it 'should have a cross product', ->
             i = linear.Vector.i()
             j = linear.Vector.j()
@@ -87,6 +118,7 @@ describe 'Matrix', ->
         [2, 3],
         [5, 7]
     )
+
     it 'can be constructed', ->
         assert.deepEqual m1.data, linear.Matrix.fromArray([
             [1, 2, 3],
@@ -94,32 +126,51 @@ describe 'Matrix', ->
             [7, 8, 9]
         ]).data
         assert.equal typeof linear.Matrix.fromArray(m1.data).transpose, 'function'
+
+    it 'can be compared', ->
+        assert.ok m3.equal(new linear.Matrix(
+            [2, 3],
+            [5, 7]
+        ))
+
     it 'should be square', ->
         assert.equal m1.data[0][0], 1
         assert.equal m1.data[0][1], 2
         assert.equal m1.data[0][2], 3
         assert.equal m1.data[1][0], 4
+
     it 'can be transposed', ->
         assert.deepEqual m1.transpose().data, [
             [1, 4, 7],
             [2, 5, 8],
             [3, 6, 9]
         ]
+
     it 'can be added', ->
         assert.deepEqual m2.plus(m3).data, [
             [4, 3],
             [5, 8]
         ]
+
     it 'can be negated', ->
         assert.deepEqual m2.negate().data, [
             [-2, 0],
             [0, -1]
         ]
+
     it 'can be subtracted', ->
         assert.deepEqual m2.minus(m3).data, [
             [0, -3],
             [-5, -6]
         ]
+
+    it 'can be scaled', ->
+        assert.deepEqual m1.scale(2).data, [
+            [2,   4,  6],
+            [8,  10, 12],
+            [14, 16, 18]
+        ]
+
     it 'can be multiplied', ->
         a = new linear.Matrix(
             [1, 2, 3],
@@ -131,13 +182,14 @@ describe 'Matrix', ->
             [11, 12]
         )
         assert.deepEqual a.times(b).data, [[58, 64], [139, 154]]
-    it 'should have minors', ->
-        assert.deepEqual m1.minor(0, 2).data, [
-            [4, 5],
-            [7, 8]
+
+    it 'should be unit', ->
+        assert.deepEqual linear.Matrix.unit(3).data, [
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1]
         ]
-        assert.equal m1.data[2][2], 9
-        assert.equal typeof m1.minor(0, 2).minor, 'function'
+
     it 'can be cloned', ->
         m1_prime = new linear.Matrix(
             [1, 2, 3],
@@ -147,6 +199,21 @@ describe 'Matrix', ->
         assert.deepEqual m1.data, m1_prime.data
         m1_prime.data[0][0] = 100
         assert.notEqual m1.data[0][0], m1_prime.data[0][0]
+
+    it 'should have minors', ->
+        assert.deepEqual m1.minor(0, 2).data, [
+            [4, 5],
+            [7, 8]
+        ]
+        assert.equal m1.data[2][2], 9
+        assert.equal typeof m1.minor(0, 2).minor, 'function'
+
+        assert.equal (new linear.Matrix(
+            [1, 4, 7],
+            [3, 0, 5],
+            [-1, 9, 11]
+        )).minor(1, 2).det(), 13
+
     it 'should have a determinant', ->
         assert.equal new linear.Matrix([1]).det(), 1
         assert.equal m1.det(), 0
@@ -157,3 +224,20 @@ describe 'Matrix', ->
             [0, 1],
         )
         assert.deepEqual generalizedM.det().data, linear.Vector.i().data
+        assert.deepEqual (new linear.Matrix([4, 7], [2, 6])).det(), 10
+
+    it 'should have cofactors', ->
+        assert.deepEqual (new linear.Matrix(
+            [1, 2, 3],
+            [0, 4, 5],
+            [1, 0, 6]
+        )).cofactors().data, [
+            [24, 5, -4],
+            [-12, 3, 2],
+            [-2, -5, 4]
+        ]
+
+    it 'should have an inverse', ->
+        assert.ok (new linear.Matrix([4, 7], [2, 6])).inverse().equal(
+                   new linear.Matrix([0.6, -0.7], [-0.2, 0.4])
+                  )

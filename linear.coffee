@@ -1,8 +1,11 @@
 _ = require 'lodash'
 
+EPSILON = 0.000000000001
+
 plus = (a, b) -> a + b
 negate = (a) -> -a
 times = (a, b) -> a * b
+scale = _.curry(times)
 square = (x) -> x * x
 sum = (l) -> _.reduce(l, plus)
 prod = (l) -> _.reduce(l, times)
@@ -19,6 +22,11 @@ applyNew = (constructor, args) ->
 assert = (cond) ->
     if not cond
         throw 'Assertion failed'
+
+sigma = (i) -> 1 - 2 * (i % 2)
+
+almostEqual = (a, b) ->
+    Math.abs(a - b) < EPSILON
 
 class Vector
     constructor: (@data...) ->
@@ -42,7 +50,12 @@ class Vector
     minus: (other) ->
         generalizedMinus this, other
     scale: (scalar) ->
-        Vector.fromArray _.map(@data, _.curry(times) scalar)
+        Vector.fromArray _.map(@data, scale scalar)
+    normalize: ->
+        @scale 1 / @length()
+    equal: (other) ->
+        _.every _.zip(@data, other.data), (ab) ->
+            almostEqual(ab[0], ab[1])
     @fromArray: (data) ->
         applyNew Vector, data
     @i: ->
@@ -51,9 +64,17 @@ class Vector
         new Vector 0, 1, 0
     @k: ->
         new Vector 0, 0, 1
+    @base: (k, n) ->
+        a = (0 for i in [1..n])
+        a[k] = 1
+        Vector.fromArray a
 
 class Matrix
     constructor: (@data...) ->
+    equal: (other) ->
+        _.every _.zip(@toVectors(), other.toVectors()), (ab) ->
+            ab[0].equal(ab[1])
+
     transpose: ->
         Matrix.fromArray _.map @data[0], (col, i) =>
             _.map @data, (row) -> row[i]
@@ -63,6 +84,8 @@ class Matrix
         Matrix.fromVectors (_.map @toVectors(), generalizedNegate)
     minus: (other) ->
         generalizedMinus this, other
+    scale: (scalar) ->
+        Matrix.fromVectors (_.map @toVectors(), (v) -> v.scale(scalar))
     times: (other) ->
         rows = @toVectors()
         cols = other.transpose().toVectors()
@@ -74,8 +97,7 @@ class Matrix
             return @data[0][0]
         generalizedSum _.map @data[0], (col, index) =>
             minorDet = @minor(0, index).det()
-            sigma = 1 - 2 * (index % 2)
-            inner = generalizedScale(col, sigma * minorDet)
+            inner = generalizedScale(col, sigma(index) * minorDet)
     minor: (i, j) ->
         m = @clone()
         reducedCol = _.map m.data, (row) ->
@@ -83,10 +105,19 @@ class Matrix
             row
         reducedCol.splice i, 1
         Matrix.fromArray reducedCol
+    cofactors: () ->
+        Matrix.fromArray _.map @data, (row, i) =>
+                         _.map row, (col, j) =>
+                               sigma(i + j) * @minor(i, j).det()
+    inverse: () ->
+        @cofactors().transpose().scale(1 / @det())
     clone: ->
         Matrix.fromArray _.clone(@data, true)
     toVectors: ->
         _.map @data, Vector.fromArray
+
+    @unit: (n) ->
+        Matrix.fromArray (Vector.base(i, n).data for i in [0..n - 1])
     @fromArray: (data) ->
         applyNew Matrix, data
     @fromVectors: (vectors) ->
@@ -116,5 +147,6 @@ module.exports._sum = sum
 module.exports._prod = prod
 module.exports._zipWith = zipWith
 module.exports._generalizedScale = generalizedScale
+module.exports._sigma = sigma
 module.exports.Vector = Vector
 module.exports.Matrix = Matrix
